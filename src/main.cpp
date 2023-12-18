@@ -37,7 +37,9 @@
 #include <nvs_flash.h>
 
 #include "opendroneid.h"
-#include "mavlink/ardupilotmega/mavlink.h"
+#include "ardupilotmega/mavlink.h"
+#include "mavlink.h"
+
 //
 
 #define DIAGNOSTICS        1
@@ -134,7 +136,8 @@ volatile ODID_UAS_Data    UAS_data;
 static const char        *title = "RID Scanner", *build_date = __DATE__,
                          *blank_latlong = " ---.------";
 
-
+static MAVLinkSerial mavlink{Serial1, MAVLINK_COMM_0}
+static MAVLinkSerial mavlink{Serial, MAVLINK_COMM_1}
 
 //#if TFT_DISPLAY
 
