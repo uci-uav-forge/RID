@@ -37,7 +37,7 @@
 #include <nvs_flash.h>
 
 #include "opendroneid.h"
-
+#include "mavlink/ardupilotmega/mavlink.h"
 //
 
 #define DIAGNOSTICS        1
