@@ -11,7 +11,7 @@
 
 static HardwareSerial *serial_ports[MAVLINK_COMM_NUM_BUFFERS];
 
-#include <generated/mavlink_helpers.h>
+#include "mavlink_helpers.h"
 
 mavlink_system_t mavlink_system = {0, MAV_COMP_ID_ODID_TXRX_1};
 
