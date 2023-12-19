@@ -136,8 +136,8 @@ volatile ODID_UAS_Data    UAS_data;
 static const char        *title = "RID Scanner", *build_date = __DATE__,
                          *blank_latlong = " ---.------";
 
-static MAVLinkSerial mavlink{Serial1, MAVLINK_COMM_0}
-static MAVLinkSerial mavlink{Serial, MAVLINK_COMM_1}
+static MAVLinkSerial mavlink1{Serial1, MAVLINK_COMM_0};
+static MAVLinkSerial mavlink2{Serial, MAVLINK_COMM_1};
 
 //#if TFT_DISPLAY
 
@@ -406,6 +406,8 @@ void setup() {
 #endif
 
   Serial.print("{ \"message\": \"setup() complete\" }\r\n");
+  mavlink1.init();
+  mavlink2.init();
 
   return;
 }
@@ -434,12 +436,17 @@ void loop() {
   text[0] = i = j = k = 0;
 
   //
+  static uint64_t last_send = 0;
   
   msecs = millis();
 
 #if BLE_SCAN
 
   uint32_t last_ble_scan = 0;
+  if ((msecs - last_send) > 1000) {
+    mavlink1.mav_printf(5,"MAVLink is onnn\n");
+    mavlink2.mav_printf(5,"MAVLink is onnn\n");
+  }
 
   if ((msecs - last_ble_scan) > 2000) {
 
