@@ -15,10 +15,10 @@ public:
     void init(void) override;
     void update(void) override;
     void mav_printf(uint8_t severity, const char *fmt, ...);
+    mavlink_channel_t chan;
 
 private:
     HardwareSerial &serial;
-    mavlink_channel_t chan;
     uint32_t last_hb_ms;
     uint32_t last_hb_warn_ms;
     uint32_t param_request_last_ms;
@@ -29,5 +29,4 @@ private:
     void process_packet(mavlink_status_t &status, mavlink_message_t &msg);
     void handle_secure_command(const mavlink_secure_command_t &pkt);
 
-    void arm_status_send(void);
 };

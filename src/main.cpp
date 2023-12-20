@@ -281,17 +281,9 @@ void setup() {
   }
 
 #endif
-
-  //
-
   delay(100);
 
   Serial.begin(115200);
-
-  Serial.printf("\r\n{ \"title\": \"%s\" }\r\n",title);
-  Serial.printf("{ \"build date\": \"%s\" }\r\n",build_date);
-
-  //
 
   nvs_flash_init();
   tcpip_adapter_init();
@@ -299,7 +291,6 @@ void setup() {
   esp_event_loop_init(event_handler,NULL);
 
 #if WIFI_SCAN
-
   wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
 
   esp_wifi_init(&cfg);
@@ -312,13 +303,10 @@ void setup() {
   // The channel should be 6.
   // If the second parameter is not WIFI_SECOND_CHAN_NONE, cast it to (wifi_second_chan_t).
   // There has been a report of the ESP not scanning the first channel if the second is set.
-  
   esp_wifi_set_channel(6,WIFI_SECOND_CHAN_NONE);
-
 #endif
 
 #if BLE_SCAN
-
   BLEDevice::init(title);
 
   service_uuid = BLEUUID("0000fffa-0000-1000-8000-00805f9b34fb");
@@ -328,56 +316,6 @@ void setup() {
   BLE_scan->setActiveScan(true); 
   BLE_scan->setInterval(100);
   BLE_scan->setWindow(99);  
-
-#endif
-
-
-
-//#if TFT_DISPLAY
-
-  tft.init();
-  tft.setRotation(1);
-  tft.fillScreen(TFT_BLACK);
-  tft.setCursor(10, 10, 2);
-  tft.setTextColor(TFT_WHITE,TFT_BLACK);  tft.setTextSize(2);
-  tft.println("Hello RID");
-  if ((pixel_timestamp = (uint16_t *) calloc(TFT_WIDTH * TFT_HEIGHT,sizeof(uint16_t))) == NULL) {
-
-    Serial.print("{ \"message\": \"Unable to allocate memory for track data.\" }\r\n");
-  }
-
-#if MAX_UAVS != 8
-#warning "Align MAX_UAVS and colour assignments."
-#endif
-
-  track_colours[0] = TFT_RED;
-  track_colours[1] = TFT_GREEN;
-  track_colours[2] = TFT_YELLOW;
-  track_colours[3] = TFT_ORANGE;
-  track_colours[4] = TFT_CYAN;
-  track_colours[5] = TFT_BLUE;
-  track_colours[6] = TFT_SILVER;
-  track_colours[7] = TFT_PINK;
-  
-  track_colours[MAX_UAVS] = TFT_WHITE;
-
-  for (int i = 0, y = 4; i < MAX_UAVS; ++i, y += 4) {
-
-    //tft.drawLine(4,y,10,y,track_colours[i]);
-  }
-
-//#endif
-
-#if 0
-
-  const char *id[3] = {"OP-12345678901234567890", "GBR-OP-123456789012", "GBR-OP-12345678901234567890"};
-
-  for (i = 0; i < 3; ++i) {
-
-    sprintf(text,"\'%s\' -> \'%s\'\r\n",(char *) id[i],format_op_id((char *) id[i]));
-    Serial.print(text);
-  }
-
 #endif
 
 #if SD_LOGGER
@@ -405,7 +343,6 @@ void setup() {
 
 #endif
 
-  Serial.print("{ \"message\": \"setup() complete\" }\r\n");
   mavlink1.init();
   mavlink2.init();
 
@@ -443,10 +380,8 @@ void loop() {
 #if BLE_SCAN
 
   uint32_t last_ble_scan = 0;
-  if ((msecs - last_send) > 1000) {
-    mavlink1.mav_printf(5,"MAVLink is onnn\n");
-    mavlink2.mav_printf(5,"MAVLink is onnn\n");
-  }
+	  mavlink1.update();
+	  mavlink2.update();
 
   if ((msecs - last_ble_scan) > 2000) {
 
@@ -463,38 +398,23 @@ void loop() {
   secs  = msecs / 1000;
 
   for (i = 0; i < MAX_UAVS; ++i) {
-
     if ((uavs[i].last_seen)&&
         ((msecs - uavs[i].last_seen) > 300000L)) {
-
       uavs[i].last_seen = 0;
       uavs[i].mac[0]    = 0;
-
 #if SD_LOGGER
       if (logfiles[i].sd_log) {
-
         logfiles[i].sd_log.close();
         logfiles[i].flushed = 1;
       }
 #endif
     }
-
     if (uavs[i].flag) {
-#if TFT_DISPLAY
-      print_json(i,secs,(id_data *) &uavs[i]);
-      // XXX UAV present!
-      // print lat, lon to screen
-      tft.setTextColor(TFT_WHITE,TFT_BLACK);  tft.setTextSize(2);
-      // Set the font colour to be white with a black background, set text size multiplier to 1
-      //tft.println("Lat:");
-      tft.setCursor(0, 40, 2);
-      tft.println(uavs[i].lat_d,7) ;
-      tft.setCursor(0, 80, 2);
-      tft.println(uavs[i].long_d,7) ;
-#endif
 #if SD_LOGGER
       write_log(msecs,(id_data *) &uavs[i],&logfiles[i]);
 #endif
+      mavlink_msg_uav_found_send(mavlink1.chan,
+		      uavs[i].lat_d, uavs[i].long_d, uavs[i].altitude_msl);
 
       if ((uavs[i].lat_d)&&(uavs[i].base_lat_d)) {
 
@@ -509,23 +429,6 @@ void loop() {
         y_m = (uavs[i].lat_d  - base_lat_d)  * m_deg_lat;
         x_m = (uavs[i].long_d - base_long_d) * m_deg_long;
 
-#if TFT_DISPLAY
-        y = TFT_HEIGHT - ((y_m / TRACK_SCALE) + (TFT_HEIGHT  / 2));
-        x = ((x_m / TRACK_SCALE) + (TFT_WIDTH / 2));
-
-        if ((y >= 0)&&(y < TFT_HEIGHT)&&(x >= 0)&&(x < TFT_WIDTH)) {
-
-          //tft.drawPixel(x,y,track_colours[i]);
-
-          if (pixel_timestamp) {
-            
-            index = (y * TFT_WIDTH) + x;
-            pixel_timestamp[index] = (uint16_t) secs;
-          }
-        }
-
-
-#endif
       }
 
       uavs[i].flag = 0;
@@ -552,30 +455,6 @@ void loop() {
 #endif
   }
 
-#if TFT_DISPLAY
-
-  if (pixel_timestamp) {
-
-    for (x = 0; x < TFT_WIDTH; ++x) {
-
-      index = (clear_y * TFT_WIDTH) + x;
-
-      if (pixel_timestamp[index]) {
-
-        if ((j = (secs - (uint32_t) pixel_timestamp[index])) > TRACK_TIME) {
-
-          pixel_timestamp[index] = 0;
-          tft.drawPixel(x,clear_y,TFT_BLACK);
-        }
-      }
-    }
-
-    if (++clear_y >= TFT_HEIGHT) {
-
-      clear_y = 0;
-    }
-  }
-#endif
 
   if ((msecs - last_json) > 60000UL) { // Keep the serial link active
 
@@ -610,182 +489,6 @@ void loop() {
     msl = uavs[display_uav].altitude_msl;
     agl = uavs[display_uav].height_agl;
 
-#if (LCD_DISPLAY > 10) && (LCD_DISPLAY < 20) 
-
-    switch (display_phase++) {
-
-    case 0:
-
-      if (uavs[display_uav].mac[0]) {
-
-        sprintf(text,"%-16s",format_op_id((char *) uavs[display_uav].op_id));
-        u8x8.drawString(0,0,text);
-      }
-      break;
-
-    case 1:
-
-      if (uavs[display_uav].mac[0]) {
-
-        if (uavs[display_uav].uav_id[0]) {
-
-          for (i = 0; (i < 16)&&(uavs[display_uav].uav_id[i]); ++i) {
-
-            text[i] = uavs[display_uav].uav_id[i];
-          }
-
-          while (i < 16) {
-
-            text[i++] = ' ';
-          }
-
-          text[i] = 0;
-          
-        } else {
-
-          sprintf(text,"%02x%02x%02x%02x%02x%02x %3d",
-                  uavs[display_uav].mac[0],uavs[display_uav].mac[1],uavs[display_uav].mac[2],
-                  uavs[display_uav].mac[3],uavs[display_uav].mac[4],uavs[display_uav].mac[5],
-                  uavs[display_uav].rssi);
-        }
-
-        u8x8.drawString(0,1,text);
-      }
-      break;
-
-    case 2:
-
-      if (uavs[display_uav].mac[0]) {
-
-        if ((uavs[display_uav].lat_d >= -90.0)&&
-            (uavs[display_uav].lat_d <=  90.0)) {
-
-          dtostrf(uavs[display_uav].lat_d,11,6,text1);
-          u8x8.drawString(0,2,text1);
-          
-        } else {
-
-          u8x8.drawString(0,2,blank_latlong);
-        }
-
-        if ((msl > -1000)&&(msl < 10000)) {
-
-          sprintf(text," %4d",msl);
-          u8x8.drawString(11,2,text);
-          
-        } else {
-
-          u8x8.drawString(11,2," ----");
-        }
-      }
-      break;
-
-    case 3:
-
-      if (uavs[display_uav].mac[0]) {
-
-        if ((uavs[display_uav].long_d >= -180.0)&&
-            (uavs[display_uav].long_d <=  180.0)) {
-
-          dtostrf(uavs[display_uav].long_d,11,6,text1);
-          u8x8.drawString(0,3,text1);
-          
-        } else {
-
-          u8x8.drawString(0,3,blank_latlong);
-        }
-
-        if ((agl > -1000)&&(agl < 10000)) {
-
-          sprintf(text," %4d",agl);
-          u8x8.drawString(11,3,text);
-          
-        } else {
-
-          u8x8.drawString(11,3," ----");
-        }
-      }
-      break;
-
-    case 4:
-
-      if (uavs[display_uav].mac[0]) {
-
-        if ((uavs[display_uav].base_lat_d >= -90.0)&&
-            (uavs[display_uav].base_lat_d <=  90.0)) {
-
-          dtostrf(uavs[display_uav].base_lat_d,11,6,text1);
-          u8x8.drawString(0,4,text1);
-          
-        } else {
-
-          u8x8.drawString(0,4,blank_latlong);
-        }
-
-        if ((uavs[display_uav].speed >= 0)&&(uavs[display_uav].speed < 10000)) {
-
-          sprintf(text," %4d",uavs[display_uav].speed);
-          u8x8.drawString(11,4,text);
-          
-        } else {
-
-          u8x8.drawString(11,4," ----");
-        }
-      }
-      break;
-
-    case 5:
-
-      if (uavs[display_uav].mac[0]) {
-
-        if ((uavs[display_uav].base_long_d >= -180.0)&&
-            (uavs[display_uav].base_long_d <=  180.0)) {
-
-          dtostrf(uavs[display_uav].base_long_d,11,6,text1);
-          u8x8.drawString(0,5,text1);
-          
-        } else {
-
-          u8x8.drawString(0,5,blank_latlong);
-        }
-
-        if ((uavs[display_uav].heading >= 0)&&(uavs[display_uav].heading <= 360)) {
-
-          sprintf(text," %4d",uavs[display_uav].heading);
-          u8x8.drawString(11,5,text);
-          
-        } else {
-
-          u8x8.drawString(11,5," ----");
-        }
-      }
-      break;
-
-    case 6:
-
-      sprintf(text,"%06u",odid_wifi + odid_ble);
-      u8x8.drawString(0,6,text);
-      sprintf(text,"%06u",french_wifi);
-      u8x8.drawString(0,7,text);
-      break;
-
-    case 7:
-
-      sprintf(text,"%08x",(unsigned int) ESP.getFreeHeap());
-      u8x8.drawString(8,6,text);
-      sprintf(text,"%08x",(unsigned int) text);
-      u8x8.drawString(8,7,text);
-      break;
-
-    default:
-
-      display_phase = 0;
-      break;      
-    }    
-
-    u8x8.refreshDisplay();
-
-#endif
   }
 
   return;

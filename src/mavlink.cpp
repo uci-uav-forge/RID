@@ -40,41 +40,14 @@ MAVLinkSerial::MAVLinkSerial(HardwareSerial &_serial, mavlink_channel_t _chan) :
 void MAVLinkSerial::init(void)
 {
     // print banner at startup
-    serial.printf("ArduRemoteID version %u.%u %08x\n",
+    serial.printf("RID Scanner version %u.%u %08x\n",
                   FW_VERSION_MAJOR, FW_VERSION_MINOR, GIT_VERSION);
     mavlink_system.sysid = g.mavlink_sysid;
 }
 
 void MAVLinkSerial::update(void)
 {
-    const uint32_t now_ms = millis();
-
-    if (mavlink_system.sysid != 0) {
-        update_send();
-    } else if (g.mavlink_sysid != 0) {
-        mavlink_system.sysid = g.mavlink_sysid;
-    } else if (now_ms - last_hb_warn_ms >= 2000) {
-        last_hb_warn_ms = millis();
-        serial.printf("Waiting for heartbeat\n");
-    }
-    update_receive();
-
-    if (param_request_last_ms != 0 && now_ms - param_request_last_ms > 50) {
-        param_request_last_ms = now_ms;
-        float value;
-        if (param_next->get_as_float(value)) {
-            mavlink_msg_param_value_send(chan,
-                                         param_next->name, value,
-                                         MAV_PARAM_TYPE_REAL32,
-                                         g.param_count_float(),
-                                         g.param_index_float(param_next));
-        }
-        param_next++;
-        if (param_next->ptype == Parameters::ParamType::NONE) {
-            param_next = nullptr;
-            param_request_last_ms = 0;
-        }
-    }
+	update_send();
 }
 
 void MAVLinkSerial::update_send(void)
@@ -91,7 +64,6 @@ void MAVLinkSerial::update_send(void)
             0);
 
         // send arming status
-        arm_status_send();
     }
 }
 
@@ -292,12 +264,3 @@ void MAVLinkSerial::process_packet(mavlink_status_t &status, mavlink_message_t &
     }
 }
 
-void MAVLinkSerial::arm_status_send(void)
-{
-    const uint8_t status = parse_fail==nullptr?MAV_ODID_ARM_STATUS_GOOD_TO_ARM:MAV_ODID_ARM_STATUS_PRE_ARM_FAIL_GENERIC;
-    const char *reason = parse_fail==nullptr?"":parse_fail;
-    mavlink_msg_open_drone_id_arm_status_send(
-        chan,
-        status,
-        reason);
-}
