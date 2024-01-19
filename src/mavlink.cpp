@@ -55,13 +55,17 @@ void MAVLinkSerial::update_send(void)
     uint32_t now_ms = millis();
     if (now_ms - last_hb_ms >= 1000) {
         last_hb_ms = now_ms;
-        mavlink_msg_heartbeat_send(
-            chan,
-            MAV_TYPE_ODID,
-            MAV_AUTOPILOT_INVALID,
-            0,
-            0,
-            0);
+        // mavlink_msg_heartbeat_send(
+        //     chan,
+        //     MAV_TYPE_ODID,
+        //     MAV_AUTOPILOT_INVALID,
+        //     0,
+        //     0,
+        //     0);
+        mavlink_msg_uav_found_send(chan, 1,2, 3);
+
+      // mavlink_msg_uav_found_send(mavlink1.chan,
+		      // uavs[i].lat_d, uavs[i].long_d, uavs[i].altitude_msl);
 
         // send arming status
     }
@@ -110,6 +114,7 @@ void MAVLinkSerial::process_packet(mavlink_status_t &status, mavlink_message_t &
             mavlink_msg_heartbeat_decode(&msg, &hb);
             if (msg.sysid > 0 && hb.type != MAV_TYPE_GCS) {
                 mavlink_system.sysid = msg.sysid;
+                Serial.printf("MAVLINK: hb'd\n");
             }
         }
         break;

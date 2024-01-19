@@ -38,6 +38,7 @@
 
 #include "opendroneid.h"
 #include "ardupilotmega/mavlink.h"
+#include "ardupilotmega/mavlink_msg_uav_found.h"
 #include "mavlink.h"
 
 //
@@ -283,7 +284,7 @@ void setup() {
 #endif
   delay(100);
 
-  Serial.begin(115200);
+  Serial.begin(57600);
 
   nvs_flash_init();
   tcpip_adapter_init();
@@ -377,11 +378,14 @@ void loop() {
   
   msecs = millis();
 
+  mavlink1.mav_printf(MAV_SEVERITY_INFO, "ESP32: I am here.");
+  mavlink2.mav_printf(MAV_SEVERITY_INFO, "ESP32: I am here.");
+  mavlink1.update();
+  mavlink2.update();
+
 #if BLE_SCAN
 
   uint32_t last_ble_scan = 0;
-	  mavlink1.update();
-	  mavlink2.update();
 
   if ((msecs - last_ble_scan) > 2000) {
 
@@ -413,8 +417,8 @@ void loop() {
 #if SD_LOGGER
       write_log(msecs,(id_data *) &uavs[i],&logfiles[i]);
 #endif
-      mavlink_msg_uav_found_send(mavlink1.chan,
-		      uavs[i].lat_d, uavs[i].long_d, uavs[i].altitude_msl);
+      // mavlink_msg_uav_found_send(mavlink1.chan,
+		      // uavs[i].lat_d, uavs[i].long_d, uavs[i].altitude_msl);
 
       if ((uavs[i].lat_d)&&(uavs[i].base_lat_d)) {
 
