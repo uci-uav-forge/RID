@@ -37,9 +37,8 @@
 #include <nvs_flash.h>
 
 #include "opendroneid.h"
-#include "ardupilotmega/mavlink.h"
-#include "ardupilotmega/mavlink_msg_uav_found.h"
 #include "mavlink.h"
+#include "transport.h"
 
 //
 
@@ -378,8 +377,6 @@ void loop() {
   
   msecs = millis();
 
-  mavlink1.mav_printf(MAV_SEVERITY_INFO, "ESP32: I am here.");
-  mavlink2.mav_printf(MAV_SEVERITY_INFO, "ESP32: I am here.");
   mavlink1.update();
   mavlink2.update();
 
@@ -417,8 +414,10 @@ void loop() {
 #if SD_LOGGER
       write_log(msecs,(id_data *) &uavs[i],&logfiles[i]);
 #endif
-      // mavlink_msg_uav_found_send(mavlink1.chan,
-		      // uavs[i].lat_d, uavs[i].long_d, uavs[i].altitude_msl);
+      mavlink1.send_uav(uavs[i].lat_d,uavs[i].long_d,uavs[i].altitude_msl);
+      mavlink2.send_uav(uavs[i].lat_d,uavs[i].long_d,uavs[i].altitude_msl);
+      mavlink1.mav_printf(MAV_SEVERITY_INFO, "uav found %f,%f", uavs[i].lat_d,uavs[i].long_d);
+      mavlink2.mav_printf(MAV_SEVERITY_INFO, "uav found %f,%f", uavs[i].lat_d,uavs[i].long_d);
 
       if ((uavs[i].lat_d)&&(uavs[i].base_lat_d)) {
 

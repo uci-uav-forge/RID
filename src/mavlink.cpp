@@ -55,6 +55,7 @@ void MAVLinkSerial::update_send(void)
     uint32_t now_ms = millis();
     if (now_ms - last_hb_ms >= 1000) {
         last_hb_ms = now_ms;
+        mavlink_msg_odid_heartbeat_send(chan, 1);
         // mavlink_msg_heartbeat_send(
         //     chan,
         //     MAV_TYPE_ODID,
@@ -62,7 +63,7 @@ void MAVLinkSerial::update_send(void)
         //     0,
         //     0,
         //     0);
-        mavlink_msg_uav_found_send(chan, 1,2, 3);
+        // mavlink_msg_uav_found_send(chan, 1,2, 3);
 
       // mavlink_msg_uav_found_send(mavlink1.chan,
 		      // uavs[i].lat_d, uavs[i].long_d, uavs[i].altitude_msl);
@@ -71,6 +72,9 @@ void MAVLinkSerial::update_send(void)
     }
 }
 
+void MAVLinkSerial::send_uav(double lat, double lon, double alt) {
+        mavlink_msg_uav_found_send(chan, lat,lon,alt);
+}
 void MAVLinkSerial::update_receive(void)
 {
     // receive new packets
