@@ -31,7 +31,6 @@
 //
 
 #include <Arduino.h>
-#include <TFT_eSPI.h>
 #include <esp_wifi.h>
 #include <esp_event_loop.h>
 #include <nvs_flash.h>
@@ -55,11 +54,6 @@
 #define LCD_DISPLAY        0 // 11 for a SH1106 128X64 OLED.
 #define DISPLAY_PAGE_MS 4000
 
-#define TFT_DISPLAY        1
-#define TFT_WIDTH        128
-#define TFT_HEIGHT       160
-#define TRACK_SCALE      1.0 // m/pixel
-#define TRACK_TIME       120 // secs, 600
 
 #define ID_SIZE     (ODID_ID_SIZE + 1)
 #define MAX_UAVS           8
@@ -147,11 +141,7 @@ static MAVLinkSerial mavlink2{Serial, MAVLINK_COMM_1};
 
 #include <SPI.h>//xyz xxx ???
 
-TFT_eSPI tft = TFT_eSPI();
-#define TFT_GREY 0x5AEB // New colour
                   
-static uint16_t *pixel_timestamp = NULL;
-static uint32_t  track_colours[MAX_UAVS + 1];
 
 //#endif
 
@@ -361,14 +351,6 @@ void loop() {
   uint32_t        msecs, secs;
   static int      display_uav = 0;
   static uint32_t last_display_update = 0, last_page_change = 0, last_json = 0;
-#if LCD_DISPLAY
-  char            text1[16];
-  static int      display_phase = 0;
-#endif
-#if TFT_DISPLAY 
-  int             x, y, index = 0;
-  static int      clear_y = 0;
-#endif
 
   text[0] = i = j = k = 0;
 
