@@ -72,8 +72,8 @@ void MAVLinkSerial::update_send(void)
     }
 }
 
-void MAVLinkSerial::send_uav(double lat, double lon, double alt) {
-        mavlink_msg_uav_found_send(chan, lat,lon,alt);
+void MAVLinkSerial::send_uav(double lat, double lon, double alt, uint8_t mac[6], uint16_t heading, uint16_t hor_vel, int16_t ver_vel) {
+        mavlink_msg_uav_found_send(chan, lat,lon,alt, mac, heading, hor_vel, ver_vel);
 }
 void MAVLinkSerial::update_receive(void)
 {

@@ -34,7 +34,7 @@
 #include <esp_wifi.h>
 #include <esp_event_loop.h>
 #include <nvs_flash.h>
-
+#include<mutex>
 #include "opendroneid.h"
 #include "mavlink.h"
 #include "transport.h"
@@ -90,7 +90,10 @@ struct id_data {int       flag;
                 char      op_id[ID_SIZE];
                 char      uav_id[ID_SIZE];
                 double    lat_d, long_d, base_lat_d, base_long_d;
-                int       altitude_msl, height_agl, speed, heading, rssi;
+                int       altitude_msl, height_agl, speed, rssi;
+                uint16_t  heading;
+                uint16_t  hor_vel;
+                int16_t   ver_vel;
 };
 
 #if SD_LOGGER
@@ -119,9 +122,10 @@ static double             base_lat_d = 0.0, base_long_d = 0.0, m_deg_lat = 11000
 static struct id_log      logfiles[MAX_UAVS + 1];
 #endif
 
-volatile char             ssid[10];
-volatile unsigned int     callback_counter = 0, french_wifi = 0, odid_wifi = 0, odid_ble = 0;
-volatile struct id_data   uavs[MAX_UAVS + 1];
+std::mutex uavs_mutex;
+char             ssid[10];
+unsigned int     callback_counter = 0, french_wifi = 0, odid_wifi = 0, odid_ble = 0;
+struct id_data   uavs[MAX_UAVS + 1];
 
 volatile ODID_UAS_Data    UAS_data;
 
@@ -193,7 +197,7 @@ class MyAdvertisedDeviceCallbacks: public BLEAdvertisedDeviceCallbacks {
             (payload[2] == 0xfa)&&
             (payload[3] == 0xff)&&
             (payload[4] == 0x0d)){
-
+          uavs_mutex.lock();
           UAV            = next_uav(mac);
           UAV->last_seen = millis();
           UAV->rssi      = device.getRSSI();
@@ -217,6 +221,8 @@ class MyAdvertisedDeviceCallbacks: public BLEAdvertisedDeviceCallbacks {
             UAV->height_agl   = (int) odid_location.Height;
             UAV->speed        = (int) odid_location.SpeedHorizontal;
             UAV->heading      = (int) odid_location.Direction;
+            UAV->hor_vel = odid_location.SpeedHorizontal;
+            UAV->ver_vel = odid_location.SpeedVertical;
             break;
 
           case 0x40: // system
@@ -232,6 +238,7 @@ class MyAdvertisedDeviceCallbacks: public BLEAdvertisedDeviceCallbacks {
             strncpy((char *) UAV->op_id,(char *) odid_operator.OperatorId,ODID_ID_SIZE);
             break;
           }
+          uavs_mutex.unlock();
 
           ++odid_ble;
         }
@@ -342,7 +349,6 @@ void setup() {
 /*
  *
  */
-
 void loop() {
 
   int             i, j, k, msl, agl;
@@ -381,25 +387,20 @@ void loop() {
   secs  = msecs / 1000;
 
   for (i = 0; i < MAX_UAVS; ++i) {
+    uavs_mutex.lock();
     if ((uavs[i].last_seen)&&
         ((msecs - uavs[i].last_seen) > 300000L)) {
       uavs[i].last_seen = 0;
       uavs[i].mac[0]    = 0;
-#if SD_LOGGER
-      if (logfiles[i].sd_log) {
-        logfiles[i].sd_log.close();
-        logfiles[i].flushed = 1;
-      }
-#endif
     }
     if (uavs[i].flag) {
-#if SD_LOGGER
-      write_log(msecs,(id_data *) &uavs[i],&logfiles[i]);
-#endif
-      mavlink1.send_uav(uavs[i].lat_d,uavs[i].long_d,uavs[i].altitude_msl);
-      mavlink2.send_uav(uavs[i].lat_d,uavs[i].long_d,uavs[i].altitude_msl);
-      mavlink1.mav_printf(MAV_SEVERITY_INFO, "uav found %f,%f", uavs[i].lat_d,uavs[i].long_d);
-      mavlink2.mav_printf(MAV_SEVERITY_INFO, "uav found %f,%f", uavs[i].lat_d,uavs[i].long_d);
+      uavs_mutex.lock();
+      id_data UAV = uavs[i];
+      mavlink1.send_uav(UAV.lat_d,UAV.long_d,UAV.altitude_msl, UAV.mac, UAV.heading, UAV.hor_vel, UAV.ver_vel);
+      mavlink2.send_uav(UAV.lat_d,UAV.long_d,UAV.altitude_msl, UAV.mac, UAV.heading, UAV.hor_vel, UAV.ver_vel);
+      uavs_mutex.unlock();
+      // mavlink1.mav_printf(MAV_SEVERITY_INFO, "uav found %f,%f", uavs[i].lat_d,uavs[i].long_d);
+      // mavlink2.mav_printf(MAV_SEVERITY_INFO, "uav found %f,%f", uavs[i].lat_d,uavs[i].long_d);
 
       if ((uavs[i].lat_d)&&(uavs[i].base_lat_d)) {
 
@@ -420,25 +421,8 @@ void loop() {
 
       last_json = msecs;
     }
-
-#if SD_LOGGER
-
-    if ((logfiles[i].sd_log)&&
-        (!logfiles[i].flushed)&&
-        ((msecs - logfiles[i].last_write) > 10000)) {
-
-      digitalWrite(SD_LOGGER_LED,1);
-
-      logfiles[i].sd_log.flush();
-      logfiles[i].flushed = 1;
-
-      logfiles[i].last_write = msecs;
-
-      digitalWrite(SD_LOGGER_LED,0);
-    }  
-
-#endif
   }
+  uavs_mutex.unlock();
 
 
   if ((msecs - last_json) > 60000UL) { // Keep the serial link active
@@ -446,34 +430,6 @@ void loop() {
       print_json(MAX_UAVS,msecs / 1000,(id_data *) &uavs[MAX_UAVS]); 
 
       last_json = msecs;
-  }
-
-  //
-
-  if (( msecs > DISPLAY_PAGE_MS)&&
-      ((msecs - last_display_update) > 50)) {
-
-    last_display_update = msecs;
-
-    if ((msecs - last_page_change) >= DISPLAY_PAGE_MS) {
-
-      for (i = 1; i < MAX_UAVS; ++i) {
-
-        j = (display_uav + i) % MAX_UAVS;
-
-        if (uavs[j].mac[0]) {
-
-          display_uav = j;
-          break;
-        }
-      }
-
-      last_page_change += DISPLAY_PAGE_MS;
-    }
-
-    msl = uavs[display_uav].altitude_msl;
-    agl = uavs[display_uav].height_agl;
-
   }
 
   return;
@@ -690,9 +646,8 @@ void callback(void* buffer,wifi_promiscuous_pkt_type_t type) {
 }
 
 /*
- *
+ * uavs_mutex must be accquired before calling this function
  */
-
 struct id_data *next_uav(uint8_t *mac) {
 
   int             i;

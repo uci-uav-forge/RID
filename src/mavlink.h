@@ -15,7 +15,7 @@ public:
     void init(void) override;
     void update(void) override;
     void mav_printf(uint8_t severity, const char *fmt, ...);
-    void send_uav(double lat, double lon, double alt);
+    void send_uav(double lat, double lon, double alt, uint8_t mac[6], uint16_t heading, uint16_t hor_vel, int16_t ver_vel);
     mavlink_channel_t chan;
 
     HardwareSerial &serial;
