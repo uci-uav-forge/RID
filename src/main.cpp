@@ -36,6 +36,8 @@
 #include <nvs_flash.h>
 #include<mutex>
 #include "opendroneid.h"
+
+#include "opendroneid/libopendroneid/opendroneid.h"
 #include "mavlink.h"
 #include "transport.h"
 
