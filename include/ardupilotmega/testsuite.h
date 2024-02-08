@@ -4676,14 +4676,18 @@ static void mavlink_test_uav_found(uint8_t system_id, uint8_t component_id, mavl
         uint8_t buffer[MAVLINK_MAX_PACKET_LEN];
         uint16_t i;
     mavlink_uav_found_t packet_in = {
-        123.0,179.0,235.0
+        123.0,179.0,235.0,18483,18587,18691,{ 223, 224, 225, 226, 227, 228 }
     };
     mavlink_uav_found_t packet1, packet2;
         memset(&packet1, 0, sizeof(packet1));
         packet1.lat = packet_in.lat;
         packet1.lon = packet_in.lon;
         packet1.alt = packet_in.alt;
+        packet1.heading = packet_in.heading;
+        packet1.hor_velocity = packet_in.hor_velocity;
+        packet1.ver_velocity = packet_in.ver_velocity;
         
+        mav_array_memcpy(packet1.mac, packet_in.mac, sizeof(uint8_t)*6);
         
 #ifdef MAVLINK_STATUS_FLAG_OUT_MAVLINK1
         if (status->flags & MAVLINK_STATUS_FLAG_OUT_MAVLINK1) {
@@ -4697,12 +4701,12 @@ static void mavlink_test_uav_found(uint8_t system_id, uint8_t component_id, mavl
         MAVLINK_ASSERT(memcmp(&packet1, &packet2, sizeof(packet1)) == 0);
 
         memset(&packet2, 0, sizeof(packet2));
-    mavlink_msg_uav_found_pack(system_id, component_id, &msg , packet1.lat , packet1.lon , packet1.alt );
+    mavlink_msg_uav_found_pack(system_id, component_id, &msg , packet1.lat , packet1.lon , packet1.alt , packet1.mac , packet1.heading , packet1.hor_velocity , packet1.ver_velocity );
     mavlink_msg_uav_found_decode(&msg, &packet2);
         MAVLINK_ASSERT(memcmp(&packet1, &packet2, sizeof(packet1)) == 0);
 
         memset(&packet2, 0, sizeof(packet2));
-    mavlink_msg_uav_found_pack_chan(system_id, component_id, MAVLINK_COMM_0, &msg , packet1.lat , packet1.lon , packet1.alt );
+    mavlink_msg_uav_found_pack_chan(system_id, component_id, MAVLINK_COMM_0, &msg , packet1.lat , packet1.lon , packet1.alt , packet1.mac , packet1.heading , packet1.hor_velocity , packet1.ver_velocity );
     mavlink_msg_uav_found_decode(&msg, &packet2);
         MAVLINK_ASSERT(memcmp(&packet1, &packet2, sizeof(packet1)) == 0);
 
@@ -4715,7 +4719,7 @@ static void mavlink_test_uav_found(uint8_t system_id, uint8_t component_id, mavl
         MAVLINK_ASSERT(memcmp(&packet1, &packet2, sizeof(packet1)) == 0);
         
         memset(&packet2, 0, sizeof(packet2));
-    mavlink_msg_uav_found_send(MAVLINK_COMM_1 , packet1.lat , packet1.lon , packet1.alt );
+    mavlink_msg_uav_found_send(MAVLINK_COMM_1 , packet1.lat , packet1.lon , packet1.alt , packet1.mac , packet1.heading , packet1.hor_velocity , packet1.ver_velocity );
     mavlink_msg_uav_found_decode(last_msg, &packet2);
         MAVLINK_ASSERT(memcmp(&packet1, &packet2, sizeof(packet1)) == 0);
 
