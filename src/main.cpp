@@ -136,18 +136,7 @@ static const char        *title = "RID Scanner", *build_date = __DATE__,
 
 static MAVLinkSerial mavlink1{Serial1, MAVLINK_COMM_0};
 static MAVLinkSerial mavlink2{Serial, MAVLINK_COMM_1};
-
-//#if TFT_DISPLAY
-
-// For this library, the chip and pins are defined in User_Setup.h.
-// Which is pretty horrible.
-
-
 #include <SPI.h>//xyz xxx ???
-
-                  
-
-//#endif
 
 #if BLE_SCAN
 
