@@ -38,6 +38,7 @@
 #include "opendroneid.h"
 
 #include "opendroneid/libopendroneid/opendroneid.h"
+#include "opendroneid/libmav2odid/mav2odid.h"
 #include "mavlink.h"
 #include "transport.h"
 
@@ -201,6 +202,8 @@ class MyAdvertisedDeviceCallbacks: public BLEAdvertisedDeviceCallbacks {
           case 0x00: // basic
 
             decodeBasicIDMessage(&odid_basic,(ODID_BasicID_encoded *) odid);
+            mavlink_open_drone_id_basic_id_t basic_mav;
+            m2o_basicId2Mavlink(&basic_mav,&odid_basic);
             break;
 
           case 0x10: // location
