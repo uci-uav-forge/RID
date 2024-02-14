@@ -1,14 +1,18 @@
 # RID
-## Remote ID
-Fork of https://github.com/sxjack/uav_electronic_ids
-with libraries from:
-https://github.com/opendroneid/opendroneid-core-c
 
-A collection of programmes and libraries for Arduinos that implement various electronic IDs and ATM/UTM interfaces.
+[![PlatformIO CI](https://github.com/uci-overRID/RID/actions/workflows/pio_build.yml/badge.svg)](https://github.com/uci-overRID/RID/actions/workflows/pio_build.yml)
 
-Developed using a basic ESP32 TTGO module: 
-HiLetgo ESP32 LCD WiFi Kit ESP-32 1.14 Inch LCD Display WiFi+Bluetooth CH9102 USB Type-C Internet Development Board for Arduino
-
-Displays lat/lon of one UAV.
+## Build
 
 Repo is meant to work with PlatformIO in Visual Studio Code.
+
+## Thanks to
+
+We appreciate the code that we were able to refer to and use
+in order to build this project.
+
+Fork of [uav_electronic_ids](https://github.com/sxjack/uav_electronic_ids)
+with libraries from:
+[opendroneid-core-c](https://github.com/opendroneid/opendroneid-core-c)
+[mavlink](https://github.com/mavlink/mavlink)
+
