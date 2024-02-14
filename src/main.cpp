@@ -28,21 +28,20 @@
 #pragma GCC diagnostic warning "-Wunused-variable"
 #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
 
-//
-
 #include <Arduino.h>
 #include <esp_wifi.h>
 #include <esp_event_loop.h>
 #include <nvs_flash.h>
 #include<mutex>
-#include "opendroneid.h"
 
+// Don't change order of includes
 #include "opendroneid/libopendroneid/opendroneid.h"
-#include "opendroneid/libmav2odid/mav2odid.h"
 #include "mavlink.h"
 #include "transport.h"
+extern "C" {
+  #include "opendroneid/libmav2odid/mav2odid.h"  
+}
 
-//
 
 #define DIAGNOSTICS        1
 #define DUMP_ODID_FRAME    0
@@ -62,8 +61,6 @@
 #define MAX_UAVS           8
 #define OP_DISPLAY_LIMIT  16
 
-//
-
 #if SD_LOGGER
 
 #include <SD.h>
@@ -72,8 +69,6 @@
 // #define SD_CONFIG       SdSpiConfig(SD_CS,DEDICATED_SPI,SD_SCK_MHZ(16))
 
 #endif
-
-//
 
 #if BLE_SCAN
 
@@ -209,21 +204,15 @@ class MyAdvertisedDeviceCallbacks: public BLEAdvertisedDeviceCallbacks {
           case 0x10: // location
           
             decodeLocationMessage(&odid_location,(ODID_Location_encoded *) odid);
-            UAV->lat_d        = odid_location.Latitude;
-            UAV->long_d       = odid_location.Longitude;
-            UAV->altitude_msl = (int) odid_location.AltitudeGeo;
-            UAV->height_agl   = (int) odid_location.Height;
-            UAV->speed        = (int) odid_location.SpeedHorizontal;
-            UAV->heading      = (int) odid_location.Direction;
-            UAV->hor_vel = odid_location.SpeedHorizontal;
-            UAV->ver_vel = odid_location.SpeedVertical;
+            mavlink_open_drone_id_location_t location_mav;
+            m2o_location2Mavlink(&location_mav, &odid_location);
             break;
 
           case 0x40: // system
 
             decodeSystemMessage(&odid_system,(ODID_System_encoded *) odid);
-            UAV->base_lat_d   = odid_system.OperatorLatitude;
-            UAV->base_long_d  = odid_system.OperatorLongitude;
+            mavlink_open_drone_id_system_t system_mav;
+            m2o_system2Mavlink(&system_mav, &odid_system);
             break;
 
           case 0x50: // operator
