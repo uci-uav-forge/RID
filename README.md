@@ -11,6 +11,14 @@ is transmitted via mavlink over serial to a flight controller. It can be used
 to report threats to the ground station or perform other actions based on the
 flight controllers discretion.
 
+This project is done as part of UCI's EECS Senior Design Project and is also supported
+by [ASTM International](https://astm.org/) through their [Senior Design Project Grants](https://sn.astm.org/nextgen/nextgen-project-grants-paper-competition-and-more-jf24.html).
+
+It uses FAA regulations that require [Open Drone ID](https://www.opendroneid.org/)
+transmitters on every Drone. This regulation can be extended to allow the automated 
+drone warning and avoidance systems for other drone usersof collisions between drones 
+when they fly close to each other. Our project aims to achieve this.
+
 
 ## Build
 Repo is meant to work with PlatformIO in Visual Studio Code. 
