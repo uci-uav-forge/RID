@@ -107,13 +107,9 @@ static void               print_json(int,int,struct id_data *);
 static void               write_log(uint32_t,struct id_data *,struct id_log *);
 static esp_err_t          event_handler(void *,system_event_t *);
 static void               callback(void *,wifi_promiscuous_pkt_type_t);
-static struct id_data    *next_uav(uint8_t *);
-static void               parse_french_id(struct id_data *,uint8_t *);
+static int next_uav(uint8_t *);
 static void               parse_odid(struct id_data *,ODID_UAS_Data *);
                         
-static void               dump_frame(uint8_t *,int);
-static void               calc_m_per_deg(double,double,double *,double *);
-static char              *format_op_id(char *);
 
 static double             base_lat_d = 0.0, base_long_d = 0.0, m_deg_lat = 110000.0, m_deg_long = 110000.0;
 #if SD_LOGGER
@@ -123,7 +119,11 @@ static struct id_log      logfiles[MAX_UAVS + 1];
 std::mutex uavs_mutex;
 char             ssid[10];
 unsigned int     callback_counter = 0, french_wifi = 0, odid_wifi = 0, odid_ble = 0;
+// All four array are protected by the uavs_mutex;
 struct id_data   uavs[MAX_UAVS + 1];
+mavlink_open_drone_id_basic_id_t uav_basic_id[MAX_UAVS + 1];
+mavlink_open_drone_id_system_t uav_system[MAX_UAVS + 1];
+mavlink_open_drone_id_location_t uav_location[MAX_UAVS + 1];
 
 volatile ODID_UAS_Data    UAS_data;
 
@@ -177,7 +177,6 @@ class MyAdvertisedDeviceCallbacks: public BLEAdvertisedDeviceCallbacks {
 
         Serial.printf("%s\r\n",text);
 
-        dump_frame(payload,payload[0]);      
 #endif
 
         if ((payload[1] == 0x16)&&
@@ -185,7 +184,8 @@ class MyAdvertisedDeviceCallbacks: public BLEAdvertisedDeviceCallbacks {
             (payload[3] == 0xff)&&
             (payload[4] == 0x0d)){
           uavs_mutex.lock();
-          UAV            = next_uav(mac);
+          int UAV_i            = next_uav(mac);
+          UAV = &uavs[UAV_i];
           UAV->last_seen = millis();
           UAV->rssi      = device.getRSSI();
           UAV->flag      = 1;
@@ -197,22 +197,21 @@ class MyAdvertisedDeviceCallbacks: public BLEAdvertisedDeviceCallbacks {
           case 0x00: // basic
 
             decodeBasicIDMessage(&odid_basic,(ODID_BasicID_encoded *) odid);
-            mavlink_open_drone_id_basic_id_t basic_mav;
-            m2o_basicId2Mavlink(&basic_mav,&odid_basic);
+            m2o_basicId2Mavlink(&uav_basic_id[i],&odid_basic);
             break;
 
           case 0x10: // location
           
             decodeLocationMessage(&odid_location,(ODID_Location_encoded *) odid);
             mavlink_open_drone_id_location_t location_mav;
-            m2o_location2Mavlink(&location_mav, &odid_location);
+            m2o_location2Mavlink(&uav_location[i], &odid_location);
             break;
 
           case 0x40: // system
 
             decodeSystemMessage(&odid_system,(ODID_System_encoded *) odid);
             mavlink_open_drone_id_system_t system_mav;
-            m2o_system2Mavlink(&system_mav, &odid_system);
+            m2o_system2Mavlink(&uav_system[i], &odid_system);
             break;
 
           case 0x50: // operator
@@ -264,7 +263,7 @@ void setup() {
   delay(100);
 
   Serial.begin(57600);
-  Serial1.begin(57600, 17, 18);
+  Serial1.begin(57600, SERIAL_8N1, 17, 18);
 
   nvs_flash_init();
   tcpip_adapter_init();
@@ -369,37 +368,27 @@ void loop() {
 
   msecs = millis();
   secs  = msecs / 1000;
+  delay(100);
 
+  Serial.println("Running loop");
+  uavs_mutex.lock();
   for (i = 0; i < MAX_UAVS; ++i) {
-    uavs_mutex.lock();
     if ((uavs[i].last_seen)&&
         ((msecs - uavs[i].last_seen) > 300000L)) {
       uavs[i].last_seen = 0;
       uavs[i].mac[0]    = 0;
     }
     if (uavs[i].flag) {
-      uavs_mutex.lock();
+      // uavs_mutex.lock();
       id_data UAV = uavs[i];
-      mavlink1.send_uav(UAV.lat_d,UAV.long_d,UAV.altitude_msl, UAV.mac, UAV.heading, UAV.hor_vel, UAV.ver_vel);
-      mavlink2.send_uav(UAV.lat_d,UAV.long_d,UAV.altitude_msl, UAV.mac, UAV.heading, UAV.hor_vel, UAV.ver_vel);
-      uavs_mutex.unlock();
+      // mavlink1.send_uav(UAV.lat_d,UAV.long_d,UAV.altitude_msl, UAV.mac, UAV.heading, UAV.hor_vel, UAV.ver_vel);
+      // mavlink2.send_uav(UAV.lat_d,UAV.long_d,UAV.altitude_msl, UAV.mac, UAV.heading, UAV.hor_vel, UAV.ver_vel);
+      mavlink1.send_uav(uav_basic_id[i],uav_system[i],uav_location[i]);
+      mavlink2.send_uav(uav_basic_id[i],uav_system[i],uav_location[i]);
+      // uavs_mutex.unlock();
       // mavlink1.mav_printf(MAV_SEVERITY_INFO, "uav found %f,%f", uavs[i].lat_d,uavs[i].long_d);
       // mavlink2.mav_printf(MAV_SEVERITY_INFO, "uav found %f,%f", uavs[i].lat_d,uavs[i].long_d);
 
-      if ((uavs[i].lat_d)&&(uavs[i].base_lat_d)) {
-
-        if (base_lat_d == 0.0) {
-
-          base_lat_d  = uavs[i].base_lat_d;
-          base_long_d = uavs[i].base_long_d;
-
-          calc_m_per_deg(base_lat_d,base_long_d,&m_deg_lat,&m_deg_long);
-        }
-
-        y_m = (uavs[i].lat_d  - base_lat_d)  * m_deg_lat;
-        x_m = (uavs[i].long_d - base_long_d) * m_deg_long;
-
-      }
 
       uavs[i].flag = 0;
 
@@ -539,7 +528,8 @@ void callback(void* buffer,wifi_promiscuous_pkt_type_t type) {
 
 //
 
-  UAV = next_uav(&payload[10]);
+  int UAV_i = next_uav(&payload[10]);
+  UAV = &UAV[UAV_i];
 
   memcpy(UAV->mac,&payload[10],6);
 
@@ -550,7 +540,6 @@ void callback(void* buffer,wifi_promiscuous_pkt_type_t type) {
 
   if (memcmp(nan_dest,&payload[4],6) == 0) {
 
-    // dump_frame(payload,length);
 
     if (odid_wifi_receive_message_pack_nan_action_frame((ODID_UAS_Data *) &UAS_data,(char *) mac,payload,length) == 0) {
 
@@ -576,7 +565,6 @@ void callback(void* buffer,wifi_promiscuous_pkt_type_t type) {
 
         ++french_wifi;
 
-        parse_french_id(UAV,&payload[offset]);
 
       } else if ((typ      == 0xdd)&&
                  (((val[0] == 0x90)&&(val[1] == 0x3a)&&(val[2] == 0xe6))|| // Parrot
@@ -590,9 +578,6 @@ void callback(void* buffer,wifi_promiscuous_pkt_type_t type) {
           
           odid_message_process_pack((ODID_UAS_Data *) &UAS_data,&payload[j],length - j);
 
-#if DUMP_ODID_FRAME
-          dump_frame(payload,length);     
-#endif
           parse_odid(UAV,(ODID_UAS_Data *) &UAS_data);
         }
 
@@ -616,7 +601,6 @@ void callback(void* buffer,wifi_promiscuous_pkt_type_t type) {
 
     if (memcmp(a,"GBR-OP-",7) == 0) {
 
-      dump_frame(payload,length);     
     }
 #endif
   }
@@ -632,7 +616,7 @@ void callback(void* buffer,wifi_promiscuous_pkt_type_t type) {
 /*
  * uavs_mutex must be accquired before calling this function
  */
-struct id_data *next_uav(uint8_t *mac) {
+int next_uav(uint8_t *mac) {
 
   int             i;
   struct id_data *UAV = NULL;
@@ -662,7 +646,7 @@ struct id_data *next_uav(uint8_t *mac) {
      UAV = (struct id_data *) &uavs[MAX_UAVS - 1];
   }
 
-  return UAV;
+  return i;
 }
 
 /*
@@ -704,248 +688,3 @@ void parse_odid(struct id_data *UAV,ODID_UAS_Data *UAS_data2) {
   return;
 }
 
-/*
- *
- */
-
-void parse_french_id(struct id_data *UAV,uint8_t *payload) {
-
-  int            length, i, j, l, t, index;
-  uint8_t       *v;
-  union {int32_t i32; uint32_t u32;}
-                 uav_lat, uav_long, base_lat, base_long;
-  union {int16_t i16; uint16_t u16;} 
-                 alt, height;
-
-  uav_lat.u32  
-  = 
-  uav_long.u32  = 
-  base_lat.u32  =
-  base_long.u32 = 0;
-
-  alt.u16       =
-  height.u16    = 0;
-
-  index  = 0;
-  length = payload[1];
-
-  UAV->flag = 1;
-
-  for (j = 6; j < length;) {
-
-    t =  payload[j];
-    l =  payload[j + 1];
-    v = &payload[j + 2];
-
-    switch (t) {
-
-    case  1:
-
-      if (v[0] != 1) {
-
-        return;
-      }
-      
-      break;
-
-    case  2:
-
-      for (i = 0; (i < (l - 6))&&(i < (ID_SIZE - 1)); ++i) {
-
-        UAV->op_id[i] = (char) v[i + 6];
-      }
-
-      UAV->op_id[i] = 0;
-      break;
-
-    case  3:
-
-      for (i = 0; (i < l)&&(i < (ID_SIZE - 1)); ++i) {
-
-        UAV->uav_id[i] = (char) v[i];
-      }
-
-      UAV->uav_id[i] = 0;
-      break;
-
-    case  4:
-
-      for (i = 0; i < 4; ++i) {
-
-        uav_lat.u32 <<= 8;
-        uav_lat.u32  |= v[i];
-      }
-
-      break;
-
-    case  5:
-
-      for (i = 0; i < 4; ++i) {
-
-        uav_long.u32 <<= 8;
-        uav_long.u32  |= v[i];
-      }
-
-      break;
-
-    case  6:
-
-      alt.u16 = (((uint16_t) v[0]) << 8) | (uint16_t) v[1];
-      break;
-
-    case  7:
-
-      height.u16 = (((uint16_t) v[0]) << 8) | (uint16_t) v[1];
-      break;
-
-    case  8:
-
-      for (i = 0; i < 4; ++i) {
-
-        base_lat.u32 <<= 8;
-        base_lat.u32  |= v[i];
-      }
-
-      break;
-
-    case  9:
-
-      for (i = 0; i < 4; ++i) {
-
-        base_long.u32 <<= 8;
-        base_long.u32  |= v[i];
-      }
-
-      break;
-
-    case 10:
-
-      UAV->speed = v[0];   
-      break;
-
-    case 11:
-
-      UAV->heading = (((uint16_t) v[0]) << 8) | (uint16_t) v[1];
-      break;
-
-    default:
-    
-      break;
-    }
-
-    j += l + 2;
-  }
-
-  UAV->lat_d        = 1.0e-5 * (double) uav_lat.i32;
-  UAV->long_d       = 1.0e-5 * (double) uav_long.i32;
-  UAV->base_lat_d   = 1.0e-5 * (double) base_lat.i32;
-  UAV->base_long_d  = 1.0e-5 * (double) base_long.i32;
-
-  UAV->altitude_msl = alt.i16;
-  UAV->height_agl   = height.i16;
-
-  return;
-}
-
-/*
- *
- */
-
-void dump_frame(uint8_t *frame,int length) {
-
-  int      i;
-  char     text[128], text2[20];
-
-  text[0]     = 0;
-  text2[0]    =
-  text2[16]   = 0; 
-
-  sprintf(text,"\r\nFrame, %d bytes\r\n   ",length);
-  Serial.print(text);
-
-  for (i = 0; i < 16; ++i) {
-
-    sprintf(text,"%02d ",i);
-    Serial.print(text);
-  }
-
-  Serial.print("\r\n 0 ");
-
-  for (i = 0; i < (length + 4);) {
-
-    sprintf(text,"%02x ",frame[i]);
-    Serial.print(text);
-
-    text2[i % 16] = ((frame[i] > 31)&&(frame[i] < 127)) ? frame[i]: '.';
-
-    if ((++i % 16) == 0) {
-
-      sprintf(text,"%s\r\n%2d ",text2,i / 16);
-      Serial.print(text);          
-    }
-
-    text2[i % 16] = 0;
-  }
-    
-  Serial.print("\r\n\r\n");          
-
-  return;
-}
-
-/*
- *
- */
-
-void calc_m_per_deg(double lat_d,double long_d,double *m_deg_lat,double *m_deg_long) {
-
-  double pi, deg2rad, sin_lat, cos_lat, a, b, radius;
-
-  pi       = 4.0 * atan(1.0);
-  deg2rad  = pi / 180.0;
-
-  sin_lat     = sin(lat_d * deg2rad);
-  cos_lat     = cos(lat_d * deg2rad);
-  a           = 0.08181922;
-  b           = a * sin_lat;
-  radius      = 6378137.0 * cos_lat / sqrt(1.0 - (b * b));
-  *m_deg_long = deg2rad * radius;
-  *m_deg_lat   = 111132.954 - (559.822 * cos(2.0 * lat_d * deg2rad)) - 
-                (1.175 *  cos(4.0 * lat_d * deg2rad));
-
-  return;
-}
-
-/*
- *
- */
-
-char *format_op_id(char *op_id) {
-
-  int           i, j, len;
-  char         *a, *b;
-  static char   short_id[OP_DISPLAY_LIMIT + 2];
-  const char   *_op_ = "-OP-";
-
-  strncpy(short_id,op_id,i = sizeof(short_id)); 
-  
-  short_id[OP_DISPLAY_LIMIT] = 0;
-
-  if ((len = strlen(op_id)) > OP_DISPLAY_LIMIT) {
-
-    if (a = strstr(short_id,_op_)) {
-
-      b = strstr(op_id,_op_);
-      j = strlen(a);
-
-      strncpy(a,&b[3],j);
-      short_id[OP_DISPLAY_LIMIT] = 0;
-    }
-  }
-
-  return short_id;
-}
-
-
-/*
- *
- */ 
