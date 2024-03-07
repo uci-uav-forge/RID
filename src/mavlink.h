@@ -10,6 +10,7 @@
  */
 class MAVLinkSerial : public Transport {
 public:
+    bool sends[9];
     using Transport::Transport;
     MAVLinkSerial(HardwareSerial &serial, mavlink_channel_t chan);
     void init(void) override;
@@ -17,6 +18,7 @@ public:
     void mav_printf(uint8_t severity, const char *fmt, ...);
     void send_uav(double lat, double lon, double alt, uint8_t mac[6], uint16_t heading, uint16_t hor_vel, int16_t ver_vel);
     void send_uav(mavlink_open_drone_id_basic_id_t basic_id,mavlink_open_drone_id_system_t system,mavlink_open_drone_id_location_t location);
+    void schedule_send_uav(int i);
     mavlink_channel_t chan;
 
     HardwareSerial &serial;
@@ -26,7 +28,7 @@ public:
     const Parameters::Param *param_next;
 
     void update_receive(void);
-    void update_send(void);
+    void update_send(mavlink_open_drone_id_basic_id_t* basic_id,mavlink_open_drone_id_system_t* system,mavlink_open_drone_id_location_t* location);
     void process_packet(mavlink_status_t &status, mavlink_message_t &msg);
     void handle_secure_command(const mavlink_secure_command_t &pkt);
 

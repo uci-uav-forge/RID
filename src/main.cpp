@@ -186,32 +186,35 @@ class MyAdvertisedDeviceCallbacks: public BLEAdvertisedDeviceCallbacks {
           uavs_mutex.lock();
           int UAV_i            = next_uav(mac);
           UAV = &uavs[UAV_i];
-          UAV->last_seen = millis();
-          UAV->rssi      = device.getRSSI();
-          UAV->flag      = 1;
+          uavs[UAV_i].last_seen = millis();
+          uavs[UAV_i].rssi      = device.getRSSI();
+          uavs[UAV_i].flag      = 1;
+          mavlink1.schedule_send_uav(UAV_i);
+          mavlink2.schedule_send_uav(UAV_i);
+          // Serial.println("Setting flag 1");
 
-          memcpy(UAV->mac,mac,6);
+          memcpy(uavs[UAV_i].mac,mac,6);
 
           switch (odid[0] & 0xf0) {
 
           case 0x00: // basic
 
             decodeBasicIDMessage(&odid_basic,(ODID_BasicID_encoded *) odid);
-            m2o_basicId2Mavlink(&uav_basic_id[i],&odid_basic);
+            m2o_basicId2Mavlink(&uav_basic_id[UAV_i],&odid_basic);
             break;
 
           case 0x10: // location
           
             decodeLocationMessage(&odid_location,(ODID_Location_encoded *) odid);
             mavlink_open_drone_id_location_t location_mav;
-            m2o_location2Mavlink(&uav_location[i], &odid_location);
+            m2o_location2Mavlink(&uav_location[UAV_i], &odid_location);
             break;
 
           case 0x40: // system
 
             decodeSystemMessage(&odid_system,(ODID_System_encoded *) odid);
             mavlink_open_drone_id_system_t system_mav;
-            m2o_system2Mavlink(&uav_system[i], &odid_system);
+            m2o_system2Mavlink(&uav_system[UAV_i], &odid_system);
             break;
 
           case 0x50: // operator
@@ -350,6 +353,8 @@ void loop() {
 
   mavlink1.update();
   mavlink2.update();
+  mavlink1.update_send(uav_basic_id,uav_system,uav_location);
+  mavlink2.update_send(uav_basic_id,uav_system,uav_location);
 
 #if BLE_SCAN
 
@@ -378,6 +383,7 @@ void loop() {
       uavs[i].last_seen = 0;
       uavs[i].mac[0]    = 0;
     }
+    // Serial.printf("Flag: %d\n", uavs[i].flag);
     if (uavs[i].flag) {
       // uavs_mutex.lock();
       id_data UAV = uavs[i];
@@ -391,6 +397,7 @@ void loop() {
 
 
       uavs[i].flag = 0;
+      // Serial.println("UnSetting flag 1");
 
       last_json = msecs;
     }
@@ -658,18 +665,21 @@ void parse_odid(struct id_data *UAV,ODID_UAS_Data *UAS_data2) {
   if (UAS_data2->BasicIDValid[0]) {
 
     UAV->flag = 1;
+      // Serial.println("Setting flag 2");
     strncpy((char *) UAV->uav_id,(char *) UAS_data2->BasicID[0].UASID,ODID_ID_SIZE);
   }
 
   if (UAS_data2->OperatorIDValid) {
 
     UAV->flag = 1;
+      // Serial.println("Setting flag 3");
     strncpy((char *) UAV->op_id,(char *) UAS_data2->OperatorID.OperatorId,ODID_ID_SIZE);
   }
 
   if (UAS_data2->LocationValid) {
 
     UAV->flag         = 1;
+      // Serial.println("Setting flag 4");
     UAV->lat_d        = UAS_data2->Location.Latitude;
     UAV->long_d       = UAS_data2->Location.Longitude;
     UAV->altitude_msl = (int) UAS_data2->Location.AltitudeGeo;
@@ -681,6 +691,7 @@ void parse_odid(struct id_data *UAV,ODID_UAS_Data *UAS_data2) {
   if (UAS_data2->SystemValid) {
 
     UAV->flag        = 1;
+      // Serial.println("Setting flag 5");
     UAV->base_lat_d  = UAS_data2->System.OperatorLatitude;
     UAV->base_long_d = UAS_data2->System.OperatorLongitude;
   }  
