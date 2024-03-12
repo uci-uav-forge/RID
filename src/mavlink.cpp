@@ -35,6 +35,9 @@ MAVLinkSerial::MAVLinkSerial(HardwareSerial &_serial, mavlink_channel_t _chan) :
     chan(_chan)
 {
     serial_ports[uint8_t(_chan - MAVLINK_COMM_0)] = &serial;
+    for(int i = 0;i<9;i++) {
+    sends[i] = {false};
+    }
 }
 
 void MAVLinkSerial::init(void)
@@ -47,15 +50,19 @@ void MAVLinkSerial::init(void)
 
 void MAVLinkSerial::update(void)
 {
-	update_send();
 }
 
-void MAVLinkSerial::update_send(void)
+void MAVLinkSerial::update_send(mavlink_open_drone_id_basic_id_t* basic_id,mavlink_open_drone_id_system_t* system,mavlink_open_drone_id_location_t* location)
 {
     uint32_t now_ms = millis();
+    for(int i = 0;i<9;i++) {
+      if(sends[i]) {
+        this->send_uav(basic_id[i], system[i], location[i]);
+      }
+    }
     if (now_ms - last_hb_ms >= 1000) {
         last_hb_ms = now_ms;
-        mavlink_msg_odid_heartbeat_send(chan, 1);
+        // mavlink_msg_odid_heartbeat_send(chan, 1);
         // mavlink_msg_heartbeat_send(
         //     chan,
         //     MAV_TYPE_ODID,
@@ -271,5 +278,16 @@ void MAVLinkSerial::process_packet(mavlink_status_t &status, mavlink_message_t &
         // we don't care about other packets
         break;
     }
+}
+
+void MAVLinkSerial::send_uav(mavlink_open_drone_id_basic_id_t basic_id,mavlink_open_drone_id_system_t system,mavlink_open_drone_id_location_t location) {
+  mavlink_msg_open_drone_id_basic_id_send_struct(chan, &basic_id);
+  // mavlink_msg_open_drone_system_send_struct(chan, &system);
+  mavlink_msg_open_drone_id_location_send_struct(chan, &location);
+}
+
+void MAVLinkSerial::schedule_send_uav(int i) {
+  Serial.printf("Send scheduled %i\n",i);
+  sends[i] = true;
 }
 

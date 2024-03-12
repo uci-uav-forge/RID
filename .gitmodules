@@ -1,3 +1,6 @@
 [submodule "src/mavlink"]
 	path = src/mavlink
-	url = git@github.com:uci-overRID/mavlink.git
+	url = https://github.com/uci-overRID/mavlink.git
+[submodule "src/opendroneid"]
+	path = src/opendroneid
+	url =  https://github.com/uci-overRID/opendroneid-core-c.git
