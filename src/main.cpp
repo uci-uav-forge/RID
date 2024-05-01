@@ -404,8 +404,9 @@ void loop() {
   }
   uavs_mutex.unlock();
 
-
-  if ((msecs - last_json) > 60000UL) { // Keep the serial link active
+  //The esp32 is printing to serial here, and to modify the frequency of its reports,
+  //modifications were made to the time difference between each report.
+  if ((msecs - last_json) > 6000) { // Keep the serial link active
 
       print_json(MAX_UAVS,msecs / 1000,(id_data *) &uavs[MAX_UAVS]); 
 
@@ -428,16 +429,16 @@ void print_json(int index,int secs,struct id_data *UAV) {
   dtostrf(UAV->base_lat_d,11,6,text3);
   dtostrf(UAV->base_long_d,11,6,text4);
 
-  sprintf(text,"{ \"index\": %d, \"runtime\": %d, \"mac\": \"%02x:%02x:%02x:%02x:%02x:%02x\", ",
+  sprintf(text,"{ \"time stamp\": %d, \"index\": %d, \"runtime\": %d, \"mac\": \"%02x:%02x:%02x:%02x:%02x:%02x\", ",
           index,secs,
           UAV->mac[0],UAV->mac[1],UAV->mac[2],UAV->mac[3],UAV->mac[4],UAV->mac[5]);
-  Serial.print(text);
+  Serial.write(text);
   sprintf(text,"\"id\": \"%s\", \"uav latitude\": %s, \"uav longitude\": %s, \"alitude msl\": %d, ",
           UAV->op_id,text1,text2,UAV->altitude_msl);
-  Serial.print(text);
+  Serial.write(text);
   sprintf(text,"\"height agl\": %d, \"base latitude\": %s, \"base longitude\": %s, \"speed\": %d, \"heading\": %d }\r\n",
           UAV->height_agl,text3,text4,UAV->speed,UAV->heading);
-  Serial.print(text);
+  Serial.write(text);
 
   return;
 }
